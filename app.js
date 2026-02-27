@@ -115,6 +115,9 @@ async function startCheck() {
     animateSteps();
 
     try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes
+
         const response = await fetch(N8N_WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -122,7 +125,10 @@ async function startCheck() {
                 entities: entities,
                 timestamp: new Date().toISOString(),
             }),
+            signal: controller.signal,
         });
+
+        clearTimeout(timeout);
 
         if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
