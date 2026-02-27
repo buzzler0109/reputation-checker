@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Reputation Shield — Niko Technologies</title>
+    <meta name="description"
+        content="AI-powered reputation monitoring by Niko Technologies. Track brand mentions, risks, and sentiment across the web.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Animated background -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow--1"></div>
+    <div class="bg-glow bg-glow--2"></div>
+
+    <main>
+        <!-- Header -->
+        <nav class="nav">
+            <div class="nav__logo">
+                <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>Niko Technologies</span>
+            </div>
+            <div class="nav__badge">AI Reputation Shield</div>
+        </nav>
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero__badge">
+                <span class="hero__badge-dot"></span>
+                Real-time Intelligence
+            </div>
+            <h1 class="hero__title">
+                Monitor <span class="hero__title--accent">Reputational Risks</span> Across Your Ecosystem
+            </h1>
+            <p class="hero__subtitle">
+                Track your company, products, and key people across the web — reviews, news, social media, legal
+                records. Our AI agent builds a comprehensive reputation report in minutes.
+            </p>
+
+            <!-- Entity Tags -->
+            <div class="entities" id="entitiesSection">
+                <label class="entities__label">Entities to scan:</label>
+                <div class="entities__list" id="entityList">
+                    <!-- Tags rendered by JS -->
+                </div>
+                <div class="entities__add">
+                    <input type="text" id="newEntityInput" class="entities__input"
+                        placeholder="Add company, person, or product...">
+                    <button class="entities__add-btn" onclick="addEntity()" title="Add entity">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Check Button -->
+            <div class="search" id="searchForm">
+                <button id="checkBtn" class="search__btn" onclick="startCheck()">
+                    <svg class="search__btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                    <span class="search__btn-text">Check Reputational Risks</span>
+                    <svg class="search__btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                </button>
+                <p class="search__hint">Each entity will be analyzed separately with a dedicated AI agent</p>
+            </div>
+
+            <!-- Status Panel -->
+            <div class="status" id="statusPanel" style="display: none;">
+                <div class="status__spinner" id="statusSpinner">
+                    <div class="status__ring"></div>
+                </div>
+                <div class="status__content">
+                    <h3 class="status__title" id="statusTitle">Analyzing...</h3>
+                    <p class="status__text" id="statusText">Our AI agent is scanning the web.</p>
+                </div>
+            </div>
+
+            <!-- Progress Steps -->
+            <div class="steps" id="stepsPanel" style="display: none;">
+                <div class="step" id="step1">
+                    <div class="step__dot"></div>
+                    <span>Scanning web mentions for each entity</span>
+                </div>
+                <div class="step" id="step2">
+                    <div class="step__dot"></div>
+                    <span>Analyzing sentiment & identifying risks</span>
+                </div>
+                <div class="step" id="step3">
+                    <div class="step__dot"></div>
+                    <span>Generating detailed report per entity</span>
+                </div>
+                <div class="step" id="step4">
+                    <div class="step__dot"></div>
+                    <span>Publishing unified report website</span>
+                </div>
+                <div class="step" id="step5">
+                    <div class="step__dot"></div>
+                    <span>Sending notification via Telegram</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section class="features">
+            <div class="feature">
+                <div class="feature__icon-wrap feature__icon-wrap--cyan">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                </div>
+                <h3>Multi-entity Scanning</h3>
+                <p>Scan companies, founders, products, and brands — each analyzed by a dedicated AI agent.</p>
+            </div>
+            <div class="feature">
+                <div class="feature__icon-wrap feature__icon-wrap--emerald">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <h3>Risk Assessment</h3>
+                <p>AI-powered risk scoring: green (safe), yellow (watch), red (critical threats detected).</p>
+            </div>
+            <div class="feature">
+                <div class="feature__icon-wrap feature__icon-wrap--amber">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <h3>Auto-published Reports</h3>
+                <p>Report websites generated and deployed automatically. Shareable links via Telegram.</p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer__brand">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                Niko Technologies
+            </div>
+            <p>AI-first Reputation Intelligence &bull; Powered by GPT, Claude &amp; Tavily</p>
+        </footer>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

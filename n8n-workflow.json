@@ -1,0 +1,483 @@
+{
+    "name": "Reputation Check Agent — Multi-Entity",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "reputation-check",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ],
+            "webhookId": "reputation-check"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "entities",
+                            "name": "entities",
+                            "value": "={{ $json.body.entities }}",
+                            "type": "array"
+                        },
+                        {
+                            "id": "timestamp",
+                            "name": "timestamp",
+                            "value": "={{ new Date().toISOString().split('T')[0] }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "allResults",
+                            "name": "allResults",
+                            "value": "=[]",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "id": "init",
+            "name": "Init Variables",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Convert entities array into individual items for looping\nconst entities = $input.first().json.body.entities || $input.first().json.entities;\nreturn entities.map(entity => ({ json: { ...entity, timestamp: new Date().toISOString().split('T')[0] } }));"
+            },
+            "id": "split-entities",
+            "name": "Split Entities",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.tavily.com/search",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ api_key: 'YOUR_TAVILY_API_KEY', query: $json.name + ' reviews reputation complaints news', search_depth: 'advanced', max_results: 8, include_raw_content: false }) }}",
+                "options": {}
+            },
+            "id": "tavily-search",
+            "name": "Tavily Search",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                920,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "entityName",
+                            "name": "entityName",
+                            "value": "={{ $('Split Entities').item.json.name }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "entityType",
+                            "name": "entityType",
+                            "value": "={{ $('Split Entities').item.json.type }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "searchResults",
+                            "name": "searchResults",
+                            "value": "={{ JSON.stringify($json) }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "timestamp",
+                            "name": "timestamp",
+                            "value": "={{ $('Split Entities').item.json.timestamp }}",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "id": "prep-entity",
+            "name": "Prepare Entity Data",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                1140,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "messages": {
+                    "values": [
+                        {
+                            "role": "system",
+                            "content": "You are a reputation analysis expert. Analyze the search results about a company/person/product and produce a structured JSON report.\n\nOutput ONLY valid JSON with this exact structure:\n{\n  \"entity\": \"Entity Name\",\n  \"entityType\": \"person|company|product\",\n  \"riskLevel\": \"green|yellow|red\",\n  \"riskScore\": 0-100,\n  \"summary\": \"2-3 sentence overview\",\n  \"mentions\": [\n    {\n      \"source\": \"Source name\",\n      \"url\": \"https://...\",\n      \"sentiment\": \"positive|neutral|negative\",\n      \"text\": \"Key quote or summary\"\n    }\n  ],\n  \"risks\": [\n    {\n      \"category\": \"Legal|Financial|PR|Product|Leadership\",\n      \"severity\": \"low|medium|high\",\n      \"description\": \"Description\"\n    }\n  ],\n  \"recommendation\": \"Overall recommendation\"\n}\n\nRisk level rules:\n- GREEN (0-30): No significant negative mentions, positive or neutral reviews\n- YELLOW (31-60): Some concerns, mixed reviews, minor issues\n- RED (61-100): Significant complaints, legal issues, fraud allegations"
+                        },
+                        {
+                            "role": "user",
+                            "content": "=Entity: {{ $json.entityName }} ({{ $json.entityType }})\n\nSearch results:\n{{ $json.searchResults }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "temperature": 0.3,
+                    "response_format": {
+                        "type": "json_object"
+                    }
+                }
+            },
+            "id": "gpt-analysis",
+            "name": "GPT - Analyze Entity",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                1380,
+                300
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "YOUR_OPENAI_CREDENTIAL_ID",
+                    "name": "OpenAI"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Collect all entity analyses into a combined array\nconst items = $input.all();\nconst results = items.map(item => {\n  try {\n    return JSON.parse(item.json.message.content);\n  } catch(e) {\n    return { entity: 'Parse Error', riskLevel: 'yellow', summary: item.json.message.content };\n  }\n});\n\n// Calculate overall risk\nconst scores = results.map(r => r.riskScore || 0);\nconst avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);\nlet overallRisk = 'green';\nif (avgScore > 60) overallRisk = 'red';\nelse if (avgScore > 30) overallRisk = 'yellow';\n\nreturn [{\n  json: {\n    overallRisk,\n    overallScore: avgScore,\n    entities: results,\n    entityCount: results.length,\n    timestamp: new Date().toISOString().split('T')[0]\n  }\n}];"
+            },
+            "id": "aggregate",
+            "name": "Aggregate Results",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1620,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "messages": {
+                    "values": [
+                        {
+                            "role": "system",
+                            "content": "You are an expert web developer. Generate a COMPLETE single-file HTML page for a multi-entity reputation report.\n\nThe page receives data for multiple entities (companies, people, products). Create a unified dashboard report.\n\nRules:\n1. COMPLETE standalone HTML file with embedded CSS, NO external dependencies\n2. Overall color theme based on the overall risk level:\n   - GREEN: Emerald tones (#059669, #d1fae5, #065f46) — calm, trustworthy\n   - YELLOW: Amber tones (#d97706, #fef3c7, #92400e) — cautious, alert  \n   - RED: Red tones (#dc2626, #fee2e2, #991b1b) — danger, critical\n3. Layout: \n   - Header: 'Niko Technologies — Reputation Report' + overall risk badge + date\n   - Overview dashboard: overall score + per-entity risk cards\n   - For EACH entity: collapsible section with risk badge, summary, mentions table (source, sentiment, quote with link), risks list\n   - Footer: 'Generated by AI Reputation Shield — Niko Technologies'\n4. Modern, professional design. System fonts. Responsive.\n5. Each entity card should have its OWN risk color indicator\n6. Mentions table columns: Source, Sentiment (with emoji ✅/⚠️/❌), Quote, Link\n\nOutput ONLY the HTML code. No markdown, no code fences, no explanation."
+                        },
+                        {
+                            "role": "user",
+                            "content": "=Generate a unified reputation report for this data:\n\nOverall Risk: {{ $json.overallRisk }} (Score: {{ $json.overallScore }})\nNumber of entities: {{ $json.entityCount }}\nDate: {{ $json.timestamp }}\n\nEntity analyses:\n{{ JSON.stringify($json.entities, null, 2) }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "temperature": 0.4,
+                    "max_tokens": 8000
+                }
+            },
+            "id": "gpt-html",
+            "name": "GPT - Generate Report HTML",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                1860,
+                300
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "YOUR_OPENAI_CREDENTIAL_ID",
+                    "name": "OpenAI"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "slug",
+                            "name": "slug",
+                            "value": "={{ 'report-' + new Date().toISOString().split('T')[0] + '-' + Math.random().toString(36).substr(2, 6) }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "htmlContent",
+                            "name": "htmlContent",
+                            "value": "={{ $json.message.content }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "overallRisk",
+                            "name": "overallRisk",
+                            "value": "={{ $('Aggregate Results').item.json.overallRisk }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "entityCount",
+                            "name": "entityCount",
+                            "value": "={{ $('Aggregate Results').item.json.entityCount }}",
+                            "type": "number"
+                        }
+                    ]
+                }
+            },
+            "id": "prep-deploy",
+            "name": "Prepare Deploy",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                2100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "PUT",
+                "url": "=https://api.github.com/repos/YOUR_GITHUB_USERNAME/reputation-reports/contents/reports/{{ $json.slug }}/index.html",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ message: 'Report: ' + $json.slug, content: Buffer.from($json.htmlContent).toString('base64'), committer: { name: 'AI Reputation Shield', email: 'bot@niko.tech' } }) }}",
+                "options": {}
+            },
+            "id": "github-push",
+            "name": "GitHub - Push Report",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2340,
+                300
+            ],
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "YOUR_GITHUB_CREDENTIAL_ID",
+                    "name": "GitHub Token"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "amount": 30,
+                "unit": "seconds"
+            },
+            "id": "wait",
+            "name": "Wait for Deploy",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                2560,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: 'YOUR_TELEGRAM_CHAT_ID', text: '🛡 Reputation Report Ready\\n\\n📊 Entities scanned: ' + $('Prepare Deploy').item.json.entityCount + '\\n⚡ Overall risk: ' + $('Prepare Deploy').item.json.overallRisk.toUpperCase() + '\\n🔗 Report: https://YOUR_VERCEL_DOMAIN/reports/' + $('Prepare Deploy').item.json.slug + '\\n📅 ' + new Date().toISOString().split('T')[0], parse_mode: 'HTML' }) }}",
+                "options": {}
+            },
+            "id": "telegram",
+            "name": "Telegram - Notify",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2780,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify({ status: 'ok', reportUrl: 'https://YOUR_VERCEL_DOMAIN/reports/' + $('Prepare Deploy').item.json.slug, overallRisk: $('Prepare Deploy').item.json.overallRisk }) }}",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "respond",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                3000,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Init Variables",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Init Variables": {
+            "main": [
+                [
+                    {
+                        "node": "Split Entities",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Split Entities": {
+            "main": [
+                [
+                    {
+                        "node": "Tavily Search",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Tavily Search": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Entity Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Entity Data": {
+            "main": [
+                [
+                    {
+                        "node": "GPT - Analyze Entity",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GPT - Analyze Entity": {
+            "main": [
+                [
+                    {
+                        "node": "Aggregate Results",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Aggregate Results": {
+            "main": [
+                [
+                    {
+                        "node": "GPT - Generate Report HTML",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GPT - Generate Report HTML": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Deploy",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Deploy": {
+            "main": [
+                [
+                    {
+                        "node": "GitHub - Push Report",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GitHub - Push Report": {
+            "main": [
+                [
+                    {
+                        "node": "Wait for Deploy",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait for Deploy": {
+            "main": [
+                [
+                    {
+                        "node": "Telegram - Notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Telegram - Notify": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "meta": {
+        "templateCredsSetupCompleted": true
+    }
+}
